@@ -4,6 +4,8 @@ import bootcamp.hibernate_practical.dto.BookResponse;
 import bootcamp.hibernate_practical.dto.CreateBookRequest;
 import bootcamp.hibernate_practical.dto.UpdateBookRequest;
 import bootcamp.hibernate_practical.entity.Book;
+import bootcamp.hibernate_practical.exception.BookNotFoundException;
+import bootcamp.hibernate_practical.exception.BookStateException;
 import bootcamp.hibernate_practical.repository.BookRepository;
 import org.springframework.stereotype.Service;
 
@@ -34,18 +36,16 @@ public class BookService {
     }
 
     public List<BookResponse> getBooksByTitle(String title) {
-        return bookRepository.findAll().stream()
-                .filter(book -> book.getTitle().toLowerCase().contains(title.toLowerCase()))
-                .map(this::mapToResponse).toList();
+        return bookRepository.findByTitleContainingIgnoreCase(title).stream().map(this::mapToResponse).toList();
     }
 
     public BookResponse getBookById(Long id) {
-        Book book = bookRepository.findById(id).orElseThrow(() -> new RuntimeException("Book with id:"+ id + " was not found"));
+        Book book = bookRepository.findById(id).orElseThrow(() -> new BookNotFoundException(id));
         return mapToResponse(book);
     }
 
     public BookResponse updateBook(Long id, UpdateBookRequest request) {
-        Book book = bookRepository.findById(id).orElseThrow(() -> new RuntimeException("There is no book with id:" + id));
+        Book book = bookRepository.findById(id).orElseThrow(() -> new BookNotFoundException(id));
         book.setAuthor(request.getAuthor());
         book.setAvailable(request.isAvailable());
         book.setGenre(request.getGenre());
@@ -56,27 +56,33 @@ public class BookService {
     }
 
     public void deleteBook(Long id) {
+        if (!bookRepository.existsById(id)) {
+            throw new BookNotFoundException(id);
+        }
         bookRepository.deleteById(id);
     }
 
     public void borrowBook(Long id) throws RuntimeException {
-        Book book = bookRepository.findById(id).orElseThrow(() -> new RuntimeException("Book with id:"+ id + " was not found"));
-        if (book.isAvailable() && book.isBorrowedStatus()) {
+        Book book = bookRepository.findById(id).orElseThrow(() -> new BookNotFoundException(id));
+        if (book.isAvailable() && !book.isBorrowedStatus()) {
             book.setBorrowedStatus(true);
             bookRepository.save(book);
         } else {
-            throw new RuntimeException("Selected book is not available to borrow");
+            throw new BookStateException("Selected book is not available to borrow");
         }
     }
 
     public void returnBook(Long id) {
-        Book book = bookRepository.findById(id).orElseThrow(() -> new RuntimeException("Book with id:"+ id + " was not found"));
+        Book book = bookRepository.findById(id).orElseThrow(() -> new BookNotFoundException(id));
+        if (!book.isBorrowedStatus()) {
+            throw new BookStateException("Selected book is not borrowed");
+        }
         book.setBorrowedStatus(false);
         bookRepository.save(book);
     }
 
     public List<BookResponse> findByAuthor(String author) {
-        return bookRepository.findByAuthor(author).stream().map(this::mapToResponse).toList();
+        return bookRepository.findByAuthorIgnoreCase(author).stream().map(this::mapToResponse).toList();
     }
 
     public List<BookResponse> findAvailableBooks(){

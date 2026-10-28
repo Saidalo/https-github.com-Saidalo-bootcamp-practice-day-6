@@ -25,12 +25,12 @@ public class BookController {
 
     @GetMapping
     public List<BookResponse> getAllBooks() {
-        return bookService.getAllBooks().stream().toList();
+        return bookService.getAllBooks();
     }
 
     @GetMapping("/title/{title}")
     public List<BookResponse> getBooksByTitle(@PathVariable String title) {
-        return bookService.getBooksByTitle(title).stream().toList();
+        return bookService.getBooksByTitle(title);
     }
 
     @GetMapping("/{id}")
